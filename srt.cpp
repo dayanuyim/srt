@@ -71,8 +71,8 @@ public:
         time_period period;
         string text;
     };
-	//static const char* ENDL;
-	static const char* EPHOC;
+    static ptime toTime(const string &t);
+    static ptime epoch();
 public:
 	//read from file
 	Srt(const string &fpath, const SrtOpt &opt);
@@ -103,8 +103,16 @@ private:
 	vector<Item> items_;
 };
 
-//const char* Srt::ENDL = "\r\n";
-const char* Srt::EPHOC = "1970-01-01 ";  //the time is not important, just for create ptime
+//static ================================
+ptime Srt::toTime(const string &t_str)
+{
+    return time_from_string("1970-01-01 " + t_str);
+}
+
+ptime Srt::epoch()
+{
+    return toTime("00:00:00");
+}
 
 //Ctor ================================
 Srt::Srt(const string &fpath, const SrtOpt &opt)
@@ -253,9 +261,7 @@ void Srt::addItem(vector<string>::const_iterator begin, vector<string>::const_it
         string msg = string("bad period format [") + *it + "]";
 		throw runtime_error(msg);
     }
-    time_period period(
-            time_from_string(EPHOC + matches[1]), 
-            time_from_string(EPHOC + matches[2]));
+    time_period period(toTime(matches[1]), toTime(matches[2]));
     ++it;
 
     //text
@@ -399,10 +405,9 @@ void Srt::offset(const time_duration &t)
 
 ptime Srt::scaleTime(const ptime &t, double scale)
 {
-    static ptime ephoc = time_from_string(Srt::EPHOC + string("00:00:00"));
-
-    long ms = (t - ephoc).total_milliseconds() * scale;
-    return ephoc + boost::posix_time::milliseconds(ms);
+    ptime base = Srt::epoch();
+    long ms = (t - base).total_milliseconds() * scale;
+    return base + boost::posix_time::milliseconds(ms);
     
 }
 
@@ -537,7 +542,7 @@ ptime getSpecTime(const char *str)
     if(!regex_match(str, is_time))
         throw ArgError("invalid item time");
 
-    return time_from_string(string(Srt::EPHOC) + str);
+    return Srt::toTime(str);
 }
 
 time_duration getOffsetTime(const char *str)
