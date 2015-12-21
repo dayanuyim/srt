@@ -95,7 +95,8 @@ private:
     void initNewline(GetLineTypes line_opt);
     void extractBomb(vector<string> &lines);
     vector<string>::const_iterator getItemTail(const vector<string> &lines, vector<string>::const_iterator head);
-    void addItem(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read = 0);
+    void readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read = 0);
+    void addItem(vector<Item> &items, const time_period &p, const string &txt, bool allow_crop=true);
     const Item& getItem(int sn) const;
 	void appendItemText(string &text, const string &s);
 private:
@@ -137,7 +138,7 @@ Srt::Srt(const string &fpath, const SrtOpt &opt)
             (tail = getItemTail(lines, head)) > head;
             head = tail)
     {
-        addItem(head, tail, &sn_read);
+        readItemBlock(head, tail, &sn_read);
     }
 }
 
@@ -237,7 +238,7 @@ void Srt::appendItemText(string &text, const string &s)
 	}
 }
 
-void Srt::addItem(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read)
+void Srt::readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read)
 {
     if(end - begin < 2)
         return;
@@ -285,34 +286,49 @@ bool intersects_most(const time_period &p1, const time_period &p2)
     return false;
 }
 
+
+void Srt::addItem(vector<Item> &items, const time_period &p, const string &txt, bool allow_crop)
+{
+    int sn = items.size() + 1;
+    if(sn == 1)
+        items.emplace_back(sn, p, txt);
+    else{
+        ptime curr = items.back().period.end();
+        if(curr <= p.begin())
+            items.emplace_back(sn, p, txt);
+        else if (curr < p.end() && allow_crop)
+            items.emplace_back(sn, time_period(curr, p.end()), txt);  //crop begin time
+        else{
+            //skip if curr >= p.end()
+        }
+    }
+}
+
 Srt& Srt::operator+=(const Srt &rhs)
 {
 	vector<Item> items;
-    int sn = 0;
 
 	for(auto i = items_.cbegin(), i_end = items_.cend(),
              j = rhs.items_.cbegin(), j_end = rhs.items_.cend();
         i != i_end && j != j_end;)
 	{
-		//is intersect at most period
-		if(i != i_end && j != j_end && intersects_most(i->period, j->period)){
-			items.emplace_back(
-                    ++sn,
-					i->period.merge(j->period),
+        //intersect
+        if(i != i_end && j!= j_end && i->period.intersects(j->period)){
+            time_period inter = i->period.intersection(j->period);
+            addItem(items, 
+					inter,
 					i->text + opt_.newline + j->text);
-			++i;
-			++j;
-		}
-		//before: insert lhs's
-		else if(j == j_end || i->period.begin() < j->period.begin()){
-			items.push_back(*i);
-			++i;
-		}
-		//after: insert rhs's
-		else{
-			items.push_back(*j);
-			++j;
-		}
+            //iterate
+            if(i->period.end() == inter.end()) ++i;
+            if(j->period.end() == inter.end()) ++j;
+        // no intersect
+        }else{
+            auto &early = (j == j_end || i->period < j->period)? i: j;
+            addItem(items, early->period, early->text, false);  //false: not allow crop.
+                                                                //(when crop -> already partly merge -> skip and just iterate)
+            ++early;
+        }
+
 	}
 
 	//swap impl
