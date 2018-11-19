@@ -84,19 +84,20 @@ public:
     Item& operator[](int i);
     const Item& operator[](int i) const;
 
-    void offset(const time_duration &t);
-    void scale(double v);
+    Srt& offset(const time_duration &t);
+    Srt& scale(double v);
+    template<class T> Srt& filter(T cond);
 
 	//output
 	void print(ostream &os) const;
 private:
     static ptime scaleTime(const ptime &t, double scale);
 	static string getFmtTime(stringstream &ss, const ptime &t); //@@! bad method
+    static void addItem(vector<Item> &items, const time_period &p, const string &txt, bool allow_crop=true);
     void initNewline(GetLineTypes line_opt);
     void extractBomb(vector<string> &lines);
     vector<string>::const_iterator getItemTail(const vector<string> &lines, vector<string>::const_iterator head);
     void readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read = 0);
-    void addItem(vector<Item> &items, const time_period &p, const string &txt, bool allow_crop=true);
     const Item& getItem(int sn) const;
 	void appendItemText(string &text, const string &s);
 private:
@@ -312,8 +313,7 @@ Srt& Srt::operator+=(const Srt &rhs)
              j = rhs.items_.cbegin(), j_end = rhs.items_.cend();
         i != i_end && j != j_end;)
 	{
-        //intersect
-        if(i != i_end && j!= j_end && i->period.intersects(j->period)){
+        if(i->period.intersects(j->period)){
             time_period inter = i->period.intersection(j->period);
             addItem(items, 
 					inter,
@@ -321,19 +321,18 @@ Srt& Srt::operator+=(const Srt &rhs)
             //iterate
             if(i->period.end() == inter.end()) ++i;
             if(j->period.end() == inter.end()) ++j;
-        // no intersect
-        }else{
-            auto &early = (j == j_end || i->period < j->period)? i: j;
-            addItem(items, early->period, early->text, false);  //false: not allow crop.
-                                                                //(when crop -> already partly merge -> skip and just iterate)
-            ++early;
+        }
+        else{
+            auto &earlier = (i->period < j->period)? i: j;
+            addItem(items, earlier->period, earlier->text, false);  // false: not allow crop.
+                                                                    // if crop is needed, the item will be dropped
+            ++earlier;
         }
 
 	}
 
 	//swap impl
 	items_ = move(items);
-
 	return *this;
 }
 
@@ -413,10 +412,11 @@ void Srt::print(ostream &os) const
 	}
 }
 
-void Srt::offset(const time_duration &t)
+Srt& Srt::offset(const time_duration &t)
 {
     for(Item &item: items_)
         item.period.shift(t);
+    return *this;
 }
 
 ptime Srt::scaleTime(const ptime &t, double scale)
@@ -427,14 +427,25 @@ ptime Srt::scaleTime(const ptime &t, double scale)
     
 }
 
-void Srt::scale(double v)
+Srt& Srt::scale(double v)
 {
     for(Item &item: items_){
         ptime begin = scaleTime(item.period.begin(), v);
         ptime end = scaleTime(item.period.end(), v);
         item.period = time_period{begin, end};
     }
+    return *this;
+}
 
+template<class T>
+Srt& Srt::filter(T cond)
+{
+    for(auto it = items_.begin(); it != items_.end(); it++){
+        if(!cond(const_cast<const Item&>(*it)))
+            items_.erase(it);
+    }
+
+    return *this;
 }
 //SrtItem ================================
 void Srt::Item::print(ostream &os) const
@@ -515,15 +526,14 @@ void dispatchMerge(const SrtOpt &opt, const list<const char*> &args)
 
     auto arg = args.cbegin(), arg_end = args.cend();
 
-    //create 1st
-    Srt s{*arg, opt};
-    ++arg;
-
-    //merge the rest
+    // merge
+    Srt merged{*arg++, opt};
     for(; arg != arg_end; ++arg)
-        s += Srt{*arg, opt};
+        merged += Srt{*arg, opt};
 
-    cout << s;
+    const time_duration min_len = boost::posix_time::milliseconds(100); 
+    merged.filter([&](const Srt::Item &item) -> bool{ return item.period.length() >= min_len; });
+    cout << merged;
 }
 
 const string& getTimeRegexStr()
@@ -645,12 +655,12 @@ void dispatchSync(const SrtOpt &opt, const list<const char*> &args)
                 srt[sn2].period.begin(),
                 time1,
                 time2);
-        srt.scale(scale);
 
         //offset
         time_duration offset = time1 - srt[sn1].period.begin();
-        srt.offset(offset);
 
+        srt.scale(scale)
+           .offset(offset);
         cout << srt;
     }
     else
