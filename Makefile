@@ -1,7 +1,7 @@
-SRCS = srt.cpp
-TARGET = $(basename $(SRCS))
+OBJS = srt.o main.o
+TARGET = srt
 
-CXXFLAGS = -std=c++11 -g3 -Wall -Wextra -pthread #-static-libgcc 
+CXXFLAGS = -std=c++17 -g3 -Wall -Wextra -pthread #-static-libgcc 
 
 #UnitTestHome=/usr/unittest-cpp/UnitTest++
 PROJECT_HOME=..
@@ -26,10 +26,17 @@ CHECKER = cppcheck --quiet --enable=all --error-exitcode=255 \
 #######################################################
 all: $(TARGET)
 
-$(TARGET): $(SRCS)
-	$(CHECKER) $(CHCKER_EX_DEFS) $(INCS) $(SRCS)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS) $(INCS) $(LDLIBS)
+$(TARGET): $(OBJS)
+#	$(CHECKER) $(CHCKER_EX_DEFS) $(INCS) $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDLIBS)
+
+main.o: main.cpp srt.h
+	$(CXX) $(CXXFLAGS) -c $< $(INCS) 
+
+
+srt.o: srt.cpp srt.h
+	$(CXX) $(CXXFLAGS) -c $< $(INCS) 
 
 .PHONY:
 clean:
-	$(RM) $(TARGET) # *.o
+	$(RM) $(TARGET) *.o

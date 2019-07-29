@@ -1,51 +1,41 @@
-//#include <UnitTest++.h>
+#include "srt.h"
+
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
 #include <set>
-#include <list>
 #include <utility>
 #include <locale>
-#include <iomanip>
+//#include <iomanip>
 #include <exception>
 #include <stdexcept>
 #include <chrono>
 #include <cctype>
-//#include <regex>
 #include <boost/regex.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <tttoolbox.h>
 
-using std::cout;
 using std::cerr;
-using std::cin;
 using std::endl;
 using std::ifstream;
 using std::ostream;
-using std::istream;
 using std::stringstream;
 using std::string;
 using std::vector;
 using std::set;
-using std::list;
 using std::pair;
-using std::make_pair;
-using std::exception;
 using std::runtime_error;
 using std::locale;
-using std::streamsize;
-using std::setw;
-using std::fixed;
-//using std::regex;
+//using std::streamsize;
+//using std::setw;
+//using std::fixed;
 using boost::regex;
-//using std::smatch;
 using boost::smatch;
 using boost::posix_time::ptime;
 using boost::posix_time::time_period;
 using boost::posix_time::time_duration;
 using boost::posix_time::time_from_string;
-using boost::posix_time::duration_from_string;
 using boost::posix_time::time_facet;
 using TTToolbox::atoi;
 using TTToolbox::locale_guard;
@@ -53,57 +43,6 @@ using TTToolbox::fgetlines;
 using TTToolbox::GetLineTypes;
 using TTToolbox::strBeginWith;
 using TTToolbox::strEndWith;
-//using TTToolbox::operator<<;
-
-struct SrtOpt{
-	bool is_condense = false;
-    string bomb;
-    string newline;
-};
-
-class Srt{
-public:
-    struct Item{
-        Item(int n, const time_period &p, const string &s)
-            :sn(n), period(p), text(s) {}
-        void print(ostream &os) const;
-        int sn;
-        time_period period;
-        string text;
-    };
-    static ptime toTime(const string &t);
-    static ptime epoch();
-public:
-	//read from file
-	Srt(const string &fpath, const SrtOpt &opt);
-
-	//merge srt
-	Srt& operator+=(const Srt &rhs);
-
-    //index, srt item No. (not index of items_)
-    Item& operator[](int i);
-    const Item& operator[](int i) const;
-
-    Srt& offset(const time_duration &t);
-    Srt& scale(double v);
-    template<class T> Srt& filter(T cond);
-
-	//output
-	void print(ostream &os) const;
-private:
-    static ptime scaleTime(const ptime &t, double scale);
-	static string getFmtTime(stringstream &ss, const ptime &t); //@@! bad method
-    static void addItem(vector<Item> &items, const time_period &p, const string &txt, bool allow_crop=true);
-    void initNewline(GetLineTypes line_opt);
-    void extractBomb(vector<string> &lines);
-    vector<string>::const_iterator getItemTail(const vector<string> &lines, vector<string>::const_iterator head);
-    void readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read = 0);
-    const Item& getItem(int sn) const;
-	void appendItemText(string &text, const string &s);
-private:
-	SrtOpt opt_;
-	vector<Item> items_;
-};
 
 //static ================================
 ptime Srt::toTime(const string &t_str)
@@ -437,16 +376,6 @@ Srt& Srt::scale(double v)
     return *this;
 }
 
-template<class T>
-Srt& Srt::filter(T cond)
-{
-    for(auto it = items_.begin(); it != items_.end(); it++){
-        if(!cond(const_cast<const Item&>(*it)))
-            items_.erase(it);
-    }
-
-    return *this;
-}
 //SrtItem ================================
 void Srt::Item::print(ostream &os) const
 {
@@ -472,276 +401,4 @@ ostream &operator<<(ostream &os, const Srt::Item &item)
 {
 	item.print(os);
 	return os;
-}
-
-//=================================================================
-string getHelp()
-{
-    stringstream ss;
-
-    ss << "USAGE" << endl;
-    ss << " srt [options] [command] [arguments]" << endl;
-    ss << endl;
-    ss << "OPTIONS" << endl;
-    ss << "  -c" << endl;
-    ss << "    condense multile lines to one line." << endl;
-    ss << "  -f=[uwm]" << endl;
-    ss << "    the newline of output: unix, windows, or mac" << endl;
-    ss << endl;
-    ss << "COMMANDS" << endl;
-    ss << "  merge  Merge multiple N srt files. N >= 1" << endl;
-    ss << "    merge <file 1>...<file N>." << endl;
-    ss << endl;
-    ss << "  offset  Offset a relative time." << endl;
-    ss << "    offset +/-<time> <file>" << endl;
-    ss << "      <time> = 'HH:mm:ss,fff'" << endl;
-    ss << "    offset -<n> <time> <file>" << endl;
-    ss << "      <n> is srt sn. The form is like above, but using specified time." << endl;
-    ss << endl;
-    ss << "  sync  Synchonize to the specified time(s)." << endl;
-    ss << "    sync -<n1> <time1> -<n2> <time2> <file>." << endl;
-    ss << "      <n1>, <n2> is srt sn. if <time> prefix '+' or '-', it is a offset, otherwise a specified time." << endl;
-    return ss.str();
-}
-
-class ArgError: public std::exception{
-public:
-    ArgError(const string &msg)
-        :msg_(msg){}
-
-    virtual const char* what() const noexcept{
-        return msg_.c_str();
-    }
-
-private:
-    std::string msg_;
-};
-
-void dispatchMerge(const SrtOpt &opt, const list<const char*> &args)
-{
-    if(args.empty())
-        throw ArgError("no file to merge");
-
-    cerr << "merge " << args.size() << " files..." << endl;
-
-    auto arg = args.cbegin(), arg_end = args.cend();
-
-    // merge
-    Srt merged{*arg++, opt};
-    for(; arg != arg_end; ++arg)
-        merged += Srt{*arg, opt};
-
-    const time_duration min_len = boost::posix_time::milliseconds(100); 
-    merged.filter([&](const Srt::Item &item) -> bool{ return item.period.length() >= min_len; });
-    cout << merged;
-}
-
-const string& getTimeRegexStr()
-{
-    static string str;
-    if(str.empty()){
-        const char *hour = "\\d+";
-        const char *saxag = "[012345]?\\d";
-        const char *frag = "(,\\d{3})?";
-        stringstream ss;
-        ss << hour << ':' << saxag << ':' << saxag << frag;
-        str = ss.str();
-    }
-    return str;
-}
-
-int getSyncSn(const char *arg)
-{
-    // cppcheck-suppress constStatement
-    static regex is_idx{"-\\d+"};
-
-    if(!regex_match(arg, is_idx))
-        throw ArgError("invalid item idx");
-    return abs(atoi(arg));
-}
-
-inline
-ptime getSpecTime(const char *str)
-{
-    static regex is_time{getTimeRegexStr()};
-
-    if(!regex_match(str, is_time))
-        throw ArgError("invalid item time");
-
-    return Srt::toTime(str);
-}
-
-time_duration getOffsetTime(const char *str)
-{
-    // cppcheck-suppress constStatement
-    static regex is_time{"[+-]" + getTimeRegexStr()};
-
-    if(!regex_match(str, is_time)){
-        cerr << "str: [" << str << "]" << endl;
-        throw ArgError("time format error");
-    }
-
-    return duration_from_string(str);
-}
-
-double getScale(ptime org_time1, ptime org_time2, ptime time1, ptime time2)
-{
-    //span
-    long org_span = (org_time2 - org_time1).total_milliseconds();
-    long span = (time2 - time1).total_milliseconds();
-    if(org_span == 0)
-        throw ArgError("invalid sync span");
-
-    //scale
-    return (double)span/org_span;
-}
-
-void dispatchOffset(const SrtOpt &opt, list<const char*> &args)
-{
-    //args
-    //form 1: offset-time srt-file
-    //form 2: -sn specified-time srt-file
-
-	if(args.size() != 2 && args.size() != 3)
-        throw ArgError("bad argument");
-
-	const bool is_offset = (args.size() == 2);
-
-	//srt
-	Srt srt{args.back(), opt};
-	args.pop_back();
-
-	//offset
-	time_duration offset = is_offset?
-		getOffsetTime(args.front()):
-		getSpecTime(args.back()) - srt[getSyncSn(args.front())].period.begin();
-
-	srt.offset(offset);
-	
-	//output
-	cout << srt;
-}
-
-inline
-bool isOffsetTime(const char *str)
-{
-    return (*str == '+') || (*str == '-');
-}
-
-void dispatchSync(const SrtOpt &opt, const list<const char*> &args)
-{
-    //scale & offset
-    if(args.size() == 5){
-        //srt
-        Srt srt{args.back(), opt};
-
-        auto arg = args.begin();
-
-        //get 1st sn,time pair
-        int sn1 = getSyncSn(*arg++);
-        ptime time1 = isOffsetTime(*arg)?
-            srt[sn1].period.begin() + getOffsetTime(*arg++) :
-            getSpecTime(*arg++);
-
-        //get 2nd sn,time pair
-        int sn2 = getSyncSn(*arg++);
-        ptime time2 = isOffsetTime(*arg)?
-            srt[sn2].period.begin() + getOffsetTime(*arg++) :
-            getSpecTime(*arg++);
-
-        //scale
-        double scale = getScale( 
-                srt[sn1].period.begin(),
-                srt[sn2].period.begin(),
-                time1,
-                time2);
-
-        //offset
-        time_duration offset = time1 - srt[sn1].period.begin();
-
-        srt.scale(scale)
-           .offset(offset);
-        cout << srt;
-    }
-    else
-        throw ArgError("bad sync arguments");
-}
-
-//read out options from args,
-//return SrtOpt
-SrtOpt readOutOpt(list<const char*> &args)
-{
-	SrtOpt opt;
-
-    for(auto it = args.begin(); it != args.end();){
-
-		if(strcmp(*it, "-c") == 0){
-			opt.is_condense = true;
-            it = args.erase(it);
-        }
-        else if(strncmp(*it, "-f=", 3) == 0){
-            char ch = (*it)[3];
-            opt.newline = 
-                (ch == 'u')? "\n":
-                (ch == 'w')? "\r\n":
-                (ch == 'm')? "\r":
-                throw ArgError("invalid new line format");
-
-            it = args.erase(it);
-        }
-        else
-            ++it;
-	}
-
-    return opt;
-}
-
-void dispatchCmd(int argc, char *argv[])
-{
-    if(argc < 2)
-        throw ArgError("no command");
-
-    list<const char*> args{argv+1, argv+argc};
-
-    //get options
-    SrtOpt opt = readOutOpt(args);
-
-    //get cmd
-    const char *cmd = args.front();
-    args.pop_front();
-
-    if(strcmp(cmd, "merge") == 0)
-        return dispatchMerge(opt, args);
-    else if(strcmp(cmd, "offset") == 0)
-        return dispatchOffset(opt, args);
-    else if(strcmp(cmd, "sync") == 0)
-        return dispatchSync(opt, args);
-    else
-        throw ArgError(string("no command '") + cmd + "'");
-}
-
-int main(int argc, char *argv[])
-{
-	try{
-        using namespace std::chrono;
-        auto start = high_resolution_clock::now();
-
-        dispatchCmd(argc, argv);
-
-        auto stop = high_resolution_clock::now();
-        cerr << "done in " << duration<double>(stop-start).count() << " seconds."<< endl;
-        
-	}
-    catch(ArgError &ex){
-        cerr << "arguments error: " << ex.what() << endl;
-        cerr << getHelp() << endl;
-    }
-	catch(exception &ex){
-		cerr << "system error: " << ex.what() << endl;
-	}
-	catch(...){
-		cerr << "system error";
-	}
-
-	return 0;
 }
