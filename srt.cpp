@@ -20,7 +20,7 @@ using std::cerr;
 using std::endl;
 using std::ifstream;
 using std::ostream;
-using std::stringstream;
+using std::ostringstream;
 using std::string;
 using std::vector;
 using std::set;
@@ -198,8 +198,9 @@ void Srt::readItemBlock(vector<string>::const_iterator begin, vector<string>::co
 	smatch matches;
 	regex is_period{R"((\d\d:\d\d:\d\d,\d*)\s*-->\s*(\d\d:\d\d:\d\d,\d*))"}; //00:03:20,234 --> 00:03:21,443
     if(!regex_search(*it, matches, is_period) || matches.size() != 3){
-        string msg = string("bad period format [") + *it + "]";
-		throw runtime_error(msg);
+        ostringstream msg;
+        msg << "bad period format: " << sn <<  ": [" << *it << "]";
+		throw runtime_error(msg.str());
     }
     time_period period(toTime(matches[1]), toTime(matches[2]));
     ++it;
@@ -290,7 +291,7 @@ const Srt::Item& Srt::getItem(int sn) const
         it = std::find_if(items_.cbegin(), quick_begin, cond);
 
     if(it == items_.cend()){
-        stringstream msg;
+        ostringstream msg;
         msg << "the SN '" << sn << "' of srt does not exist";
         throw runtime_error(msg.str());
     }
@@ -313,7 +314,7 @@ const Srt::Item& Srt::operator[](int idx) const
 //beacause I dont know hown to print ptime, with fragment precison=3, 
 //I do it by getting the string first, then cutting extra preciosn.
 //This is a bad method, should be removed future!
-string Srt::getFmtTime(stringstream &ss, const ptime &t)
+string Srt::getFmtTime(ostringstream &ss, const ptime &t)
 {
     //get string
 	ss.str("");
@@ -330,7 +331,7 @@ string Srt::getFmtTime(stringstream &ss, const ptime &t)
 void Srt::print(ostream &os) const
 {
 	//
-	stringstream ss;
+	ostringstream ss;
 	locale_guard sloc{ss,
 		locale{ss.getloc(), new time_facet("%H:%M:%S,%f")}};
 	/*/
