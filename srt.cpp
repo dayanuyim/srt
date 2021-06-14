@@ -73,12 +73,11 @@ Srt::Srt(const string &fpath, const SrtOpt &opt)
     extractBomb(lines);
 
     //items
-    set<int> sn_read;
     for(auto head = lines.cbegin(), tail = lines.cend();
             (tail = getItemTail(lines, head)) > head;
             head = tail)
     {
-        readItemBlock(head, tail, &sn_read);
+        readItemBlock(head, tail);
     }
 }
 
@@ -178,7 +177,7 @@ void Srt::appendItemText(string &text, const string &s)
 	}
 }
 
-void Srt::readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read)
+void Srt::readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end)
 {
     if(end - begin < 2)
         return;
@@ -192,7 +191,7 @@ void Srt::readItemBlock(vector<string>::const_iterator begin, vector<string>::co
     //sn warn
     if(sn <= 0)
         cerr << "[warning] not positive sn '" << sn << "'" << endl;
-    if(sn_read && !sn_read->insert(sn).second)  //not insert ok
+    if(!sn_read_.insert(sn).second)  //not insert ok
         cerr << "[warning] duplicated sn '" << sn << "'" << endl;
 
     //period

@@ -63,12 +63,13 @@ private:
     void initNewline(GetLineTypes line_opt);
     void extractBomb(vector<string> &lines);
     vector<string>::const_iterator getItemTail(const vector<string> &lines, vector<string>::const_iterator head);
-    void readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end, set<int> *sn_read = 0);
+    void readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end);
     const Item& getItem(int sn) const;
 	void appendItemText(string &text, const string &s);
 private:
 	SrtOpt opt_;
 	vector<Item> items_;
+	set<int> sn_read_;   //tracking already read sn
 };
 
 template<class T>
