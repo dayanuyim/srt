@@ -58,7 +58,7 @@ public:
 	void print(ostream &os) const;
 private:
     static ptime scaleTime(const ptime &t, double scale);
-	static string getFmtTime(ostringstream &ss, const ptime &t); //@@! bad method
+	static string fmtTime(const ptime &t); //@@! workaround method
     static void addItem(vector<Item> &items, const time_period &p, const string &txt, bool allow_crop=true);
     void initNewline(GetLineTypes line_opt);
     void extractBomb(vector<string> &lines);

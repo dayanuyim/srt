@@ -310,42 +310,47 @@ const Srt::Item& Srt::operator[](int idx) const
     return getItem(idx);
 }
 
+ostringstream _getFmtTimeStream()
+{
+	ostringstream ss;
+    std::locale loc{ss.getloc(), new time_facet("%H:%M:%S,%f")};
+    ss.imbue(loc);
+    return ss;
+}
+
 //@@!
 //beacause I dont know hown to print ptime, with fragment precison=3, 
 //I do it by getting the string first, then cutting extra preciosn.
-//This is a bad method, should be removed future!
-string Srt::getFmtTime(ostringstream &ss, const ptime &t)
+//Hope to remove the function late!
+string Srt::fmtTime(const ptime &t)
 {
+	static ostringstream ss = _getFmtTimeStream();
+    static const int ndigit = 3;
+
     //get string
 	ss.str("");
 	ss << (t + boost::posix_time::microseconds(500));   //round off
 	string fmt_t = ss.str();
 
+    //strip microsec part
 	size_t idx = fmt_t.find(',');
-	if(idx != string::npos && (fmt_t.length() - ++idx) > 3)
-		fmt_t.erase(idx +3);   //fragment precision = 3;
-
+	if(idx != string::npos){
+        idx += 1 + ndigit;      //idx of millisec end
+        if(idx < fmt_t.length())
+		    fmt_t.erase(idx);
+    }
 	return fmt_t;
 }
 
 void Srt::print(ostream &os) const
 {
-	//
-	ostringstream ss;
-	locale_guard sloc{ss,
-		locale{ss.getloc(), new time_facet("%H:%M:%S,%f")}};
-	/*/
-	locale_guard loc{os,
-		locale{os.getloc(), new time_facet("%H:%M:%S,%fff")}};
-	//*/
-
     os << opt_.bomb;
 
 	int sn = 0;
 	for(const Item &i: items_){
 		os << ++sn << opt_.newline;
 		//os << fixed << i.first.begin() << " --> "  << i.first.end() << opt_.newline;
-		os << getFmtTime(ss, i.period.begin()) << " --> "  << getFmtTime(ss, i.period.end()) << opt_.newline;
+		os << fmtTime(i.period.begin()) << " --> "  << fmtTime(i.period.end()) << opt_.newline;
 		os << i.text << opt_.newline;
 		os << opt_.newline;
 	}
