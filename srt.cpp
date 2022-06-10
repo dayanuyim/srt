@@ -77,6 +77,7 @@ Srt::Srt(const string &fpath, const SrtOpt &opt)
             (tail = getItemTail(lines, head)) > head;
             head = tail)
     {
+        if(opt_.is_verbose) cerr << "[info] Block: Line "<< lineNum(lines, head) << " to " << lineNum(lines, tail) << endl;
         readItemBlock(head, tail);
     }
 }
@@ -190,16 +191,16 @@ void Srt::readItemBlock(vector<string>::const_iterator begin, vector<string>::co
 
     //sn warn
     if(sn <= 0)
-        cerr << "[warning] not positive sn '" << sn << "'" << endl;
+        cerr << "[warning] invalid sn '" << sn << "' from content '" << *it << "'" << endl;
     if(!sn_read_.insert(sn).second)  //not insert ok
-        cerr << "[warning] duplicated sn '" << sn << "'" << endl;
+        cerr << "[warning] duplicated sn '" << *it << "'" << endl;
 
     //period
 	smatch matches;
 	regex is_period{R"((\d\d:\d\d:\d\d,\d*)\s*-->\s*(\d\d:\d\d:\d\d,\d*))"}; //00:03:20,234 --> 00:03:21,443
     if(!regex_search(*it, matches, is_period) || matches.size() != 3){
         ostringstream msg;
-        msg << "bad period format: " << sn <<  ": [" << *it << "]";
+        msg << "bad period format: sn '" << sn << "' has [" << *it << "]";
 		throw runtime_error(msg.str());
     }
     time_period period(toTime(matches[1]), toTime(matches[2]));

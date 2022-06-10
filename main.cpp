@@ -37,6 +37,8 @@ string getHelp()
     ss << "    condense multile lines to one line." << endl;
     ss << "  -f=[uwm]" << endl;
     ss << "    the newline of output: unix, windows, or mac" << endl;
+    ss << "  -v" << endl;
+    ss << "    verbose to print debug message" << endl;
     ss << endl;
     ss << "COMMANDS" << endl;
     ss << "  merge  Merge multiple N srt files. N >= 1" << endl;
@@ -236,8 +238,12 @@ SrtOpt readOutOpt(list<const char*> &args)
 
     for(auto it = args.begin(); it != args.end();){
 
-		if(strcmp(*it, "-c") == 0){
-			opt.is_condense = true;
+        if(strcmp(*it, "-c") == 0){
+            opt.is_condense = true;
+            it = args.erase(it);
+        }
+        if(strcmp(*it, "-v") == 0){
+            opt.is_verbose = true;
             it = args.erase(it);
         }
         else if(strncmp(*it, "-f=", 3) == 0){

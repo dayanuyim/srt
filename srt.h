@@ -23,6 +23,7 @@ using TTToolbox::GetLineTypes;
 
 struct SrtOpt{
 	bool is_condense = false;
+	bool is_verbose = false;
     string bomb;
     string newline;
 };
@@ -66,6 +67,7 @@ private:
     void readItemBlock(vector<string>::const_iterator begin, vector<string>::const_iterator end);
     const Item& getItem(int sn) const;
 	void appendItemText(string &text, const string &s);
+    std::ptrdiff_t lineNum(const vector<string>&lines, vector<string>::const_iterator it){ return it - lines.cbegin() + 1; }
 private:
 	SrtOpt opt_;
 	vector<Item> items_;
