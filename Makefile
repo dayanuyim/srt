@@ -1,16 +1,19 @@
 OBJS = srt.o main.o
 TARGET = srt
 
-CXXFLAGS = -std=c++17 -g3 -Wall -Wextra -pthread #-static-libgcc 
+CXXFLAGS = -std=c++23 -g3 -Wall -Wextra -pthread #-static-libgcc
 
 #UnitTestHome=/usr/unittest-cpp/UnitTest++
-PROJECT_HOME=..
+PROJECT_HOME := ..
+BOOST_ROOT := /opt/homebrew/opt/boost
 
+INCS += -I$(BOOST_ROOT)/include
 INCS += -I$(PROJECT_HOME)/toolbox/CppToolbox
 #INCS += -I$(UnitTestHome)/src
 
 #LDLIBS += -L$(UnitTestHome) -lUnitTest++
 #LDLIBS += /usr/lib/gcc/x86_64-linux-gnu/4.8/libstdc++.a
+LDLIBS += -L$(BOOST_ROOT)/lib
 LDLIBS += -lboost_system
 #LDLIBS += -lboost_thread
 LDLIBS += -lboost_date_time
@@ -31,11 +34,11 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDLIBS)
 
 main.o: main.cpp srt.h
-	$(CXX) $(CXXFLAGS) -c $< $(INCS) 
+	$(CXX) $(CXXFLAGS) -c $< $(INCS)
 
 
 srt.o: srt.cpp srt.h
-	$(CXX) $(CXXFLAGS) -c $< $(INCS) 
+	$(CXX) $(CXXFLAGS) -c $< $(INCS)
 
 .PHONY:
 clean:
